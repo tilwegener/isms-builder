@@ -16,7 +16,7 @@ services:
       # Optional: SSL-Zertifikate (read-only)
       # - ./ssl:/app/ssl:ro
     env_file:
-      - .env.docker
+      - .env
     environment:
       - NODE_ENV=production
     healthcheck:
