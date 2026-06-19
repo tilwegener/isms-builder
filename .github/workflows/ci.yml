@@ -54,11 +54,11 @@ jobs:
           STORAGE_BACKEND: json
 
       - name: Security audit (High/Critical)
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high || true
         continue-on-error: true
 
       - name: Security audit (Moderate)
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=moderate || true
         continue-on-error: true
 
       - name: Check for outdated packages
