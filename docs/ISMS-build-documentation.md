@@ -54,7 +54,7 @@ Stand: 2026-03-09 | Version: V 1.28 (Lieferkettenmodul + Risikomanagement Multi-
 Der ISMS Builder ist eine eigenständige Node.js/Express-Anwendung mit Vanilla-JS-SPA zur Erstellung, Verwaltung und Versionierung von ISMS-Dokumenten. Unterstützt werden mehrere Compliance-Frameworks sowie GDPR, Risikomanagement, Training und Reporting.
 
 **Tech-Stack:** Node.js ≥18, Express, JWT, bcryptjs, multer, better-sqlite3
-**Persistenz:** JSON-Dateien (Standard), SQLite (empfohlen, `STORAGE_BACKEND=sqlite`), MariaDB/MySQL (`STORAGE_BACKEND=mariadb`), PostgreSQL-Stub (`STORAGE_BACKEND=pg`)
+**Persistenz:** JSON-Dateien (Standard, aktuell empfohlen), SQLite (`STORAGE_BACKEND=sqlite`, siehe Hinweis in Abschnitt 31), MariaDB/MySQL (`STORAGE_BACKEND=mariadb`), PostgreSQL-Stub (`STORAGE_BACKEND=pg`)
 **Auth:** JWT-Cookie (`sm_session`), bcrypt-Passwörter, optionale TOTP-2FA
 **RBAC:** `reader`/`revision`(1) < `editor`/`dept_head`/`qmb`(2) < `contentowner`/`auditor`(3) < `admin`(4)
 **UI-Schutz:** Alle UI-Seiten außer `login.html` und ihren Abhängigkeiten sind serverseitig durch JWT-Prüfung geschützt. Unauthentifizierte Anfragen werden mit `302 → /ui/login.html` umgeleitet — unabhängig vom Client-seitigen `logincheck.js`.
@@ -160,7 +160,7 @@ JWT_SECRET=<min. 32 zufällige Zeichen>   # openssl rand -hex 32
 JWT_EXPIRES_IN=8h
 PORT=3000
 DEV_HEADER_AUTH=false
-STORAGE_BACKEND=sqlite                    # sqlite | json | mariadb | postgres
+STORAGE_BACKEND=json                      # json (empfohlen) | sqlite | mariadb | postgres
 
 # MariaDB/MySQL (nur wenn STORAGE_BACKEND=mariadb, npm install mysql2 erforderlich)
 # DB_HOST=localhost
@@ -826,7 +826,9 @@ POST /gdpr/deletion-log           – Löschung bestätigen (contentowner+)
 
 ## 18. Storage-Backend wechseln
 
-**Empfehlung:** SQLite für Produktion, JSON nur für Entwicklung und Tests.
+**Empfehlung:** JSON, solange die SQL-Backend-Migration nicht abgeschlossen ist (siehe Hinweis in
+Abschnitt 31 und [Issue #42](https://github.com/coolstartnow/isms-builder/issues/42)). SQLite ist
+nutzbar, hat aber aktuell ein bekanntes, ungefixtes Startup-Race-Condition-Problem.
 Ausführliche Migrations-Anleitung inkl. PostgreSQL-Roadmap: **→ Abschnitt 31**.
 
 **Schnellübersicht JSON → SQLite:**
@@ -1394,12 +1396,18 @@ SMTP_USER=isms@yourcompany.com
 
 | Backend | Aktivierung | Empfehlung |
 |---|---|---|
-| **JSON** | `STORAGE_BACKEND=json` | Entwicklung, Tests, Quick-Start |
-| **SQLite** | `STORAGE_BACKEND=sqlite` | **Produktivbetrieb** (Standard) |
+| **JSON** | `STORAGE_BACKEND=json` | **Aktuell empfohlen** — Entwicklung, Tests, Quick-Start, Produktivbetrieb |
+| **SQLite** | `STORAGE_BACKEND=sqlite` | Verfügbar, aktuell **nicht empfohlen** (siehe Hinweis unten) |
 | **MariaDB/MySQL** | `STORAGE_BACKEND=mariadb` | Kleines Team, vorhandene MySQL-Infra |
 | **PostgreSQL** | `STORAGE_BACKEND=pg` | Multi-Instanz, hohe Last (Stub) |
 
-**Warum SQLite für Produktion?** SQLite ist für einen selbst gehosteten ISMS-Dienst mit einer bis wenigen gleichzeitigen Nutzern ideal: keine Serverinfrastruktur, ACID-Transaktionen, WAL-Modus, Foreign Keys, einfaches Backup per `cp data/isms.db backup.db`.
+> **⚠️ Hinweis zu SQLite:** SQLite ist konzeptionell für einen selbst gehosteten ISMS-Dienst mit
+> einer bis wenigen gleichzeitigen Nutzern ideal (keine Serverinfrastruktur, ACID-Transaktionen,
+> WAL-Modus, Foreign Keys, einfaches Backup per `cp data/isms.db backup.db`) — die SQL-Backend-
+> Migration ist aber noch ein offenes Arbeitspaket. Aktuell gibt es beim Serverstart eine bekannte
+> Race Condition zwischen Schema-Initialisierung und Autopurge, die zu einem Absturz führen kann
+> (**[Issue #42](https://github.com/coolstartnow/isms-builder/issues/42)**). Solange dieses Issue
+> offen ist, wird JSON auch für den Produktivbetrieb empfohlen.
 
 **Wann MariaDB?** Wenn bereits eine MySQL/MariaDB-Infrastruktur vorhanden ist (z. B. gemeinsam genutzter Datenbankserver), mehrere Instanzen denselben Datenstand teilen sollen, oder bewusst kein SQLite-File im Dateisystem liegen soll.
 
@@ -2244,11 +2252,9 @@ Nach dem Import wird `data/.demo_lang_set` geschrieben. Beim nächsten Demo-Rese
 
 ### Bundles regenerieren
 
-```bash
-node scripts/fix-demo-bundles.js
-```
-
-Das Script liest die bestehenden EN/DE/FR-Bundles, fixiert Inhalt und erzeugt `nl.json` neu. Alle 4 Bundles werden in `data/demo-bundles/` gespeichert.
+Die vier Demo-Bundles (`data/demo-bundles/{de,en,fr,nl}.json`) werden mit einem internen
+Maintainer-Tool gepflegt, das nicht Teil dieses Repositories ist. Für eigene Anpassungen genügt es,
+die JSON-Dateien direkt zu bearbeiten — Struktur siehe bestehende Bundles.
 
 ### UI (Login-Seite)
 
@@ -2262,7 +2268,6 @@ Das Sprach-Overlay (`#demoLangOverlay`) öffnet automatisch nach dem ersten Admi
 | `data/demo-bundles/en.json` | Englisches Demo-Bundle |
 | `data/demo-bundles/fr.json` | Französisches Demo-Bundle |
 | `data/demo-bundles/nl.json` | Niederländisches Demo-Bundle |
-| `scripts/fix-demo-bundles.js` | Bundle-Generator/Fixer |
 | `server/routes/admin.js` | `POST /admin/demo-load-bundle` |
 | `ui/login.html` | Sprach-Overlay HTML + JS |
 

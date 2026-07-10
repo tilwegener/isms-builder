@@ -10,4 +10,9 @@ mkdir -p \
   /app/data/template-files \
   /app/data/legal/files
 
-exec node server/index.js
+# Läuft als root (s. Dockerfile): chownt data/ (bind-gemountet, ggf. fremder
+# Owner auf dem Host) auf den unprivilegierten isms-User und wechselt dann
+# per su-exec dorthin, bevor der Node-Prozess startet.
+chown -R isms:isms /app/data
+
+exec su-exec isms node server/index.js

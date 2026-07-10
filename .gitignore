@@ -12,6 +12,17 @@ last_order_claude.md
 .last_order_claude.md.kate-swp
 .server.pid
 internal_audit_report_rules.md
+gh-token.md
+current_conversation.md
+resume.sh
+
+# Internal-only scripts — personal infra/workflow, not for public repo
+scripts/setup-server.sh
+scripts/reset-data.sh
+scripts/stego.py
+scripts/install-test-env.sh
+scripts/publish-to-github.sh
+scripts/fix-demo-bundles.js
 
 # Dependencies
 node_modules/

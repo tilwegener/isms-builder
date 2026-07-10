@@ -20,6 +20,8 @@
     loginBtn:           { de: 'Anmelden',                                         en: 'Sign in',                                         fr: 'Se connecter',                                        nl: 'Aanmelden' },
     loginReportIncident:{ de: 'Sicherheitsvorfall melden',                        en: 'Report a Security Incident',                      fr: 'Signaler un incident de sécurité',                    nl: 'Beveiligingsincident melden' },
     loginFooter:        { de: 'ISMS Builder · ISO 27001 · BSI · NIS2 · EUCS · EU AI Act', en: 'ISMS Builder · ISO 27001 · BSI · NIS2 · EUCS · EU AI Act', fr: 'ISMS Builder · ISO 27001 · BSI · NIS2 · EUCS · EU AI Act', nl: 'ISMS Builder · ISO 27001 · BSI · NIS2 · EUCS · EU AI Act' },
+    licenseNotice:      { de: '© Claude Hecker · Open Source (AGPL-3.0)', en: '© Claude Hecker · Open source (AGPL-3.0)', fr: '© Claude Hecker · Open source (AGPL-3.0)', nl: '© Claude Hecker · Open source (AGPL-3.0)' },
+    licenseSourceLink:  { de: 'Quellcode auf GitHub', en: 'Source code on GitHub', fr: 'Code source sur GitHub', nl: 'Broncode op GitHub' },
     loginLang:          { de: 'Sprache',                                           en: 'Language',                                        fr: 'Langue',                                              nl: 'Taal' },
 
     // Demo reset banner

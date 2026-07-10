@@ -19,8 +19,9 @@ RUN npm ci --omit=dev
 FROM node:lts-alpine AS runtime
 WORKDIR /app
 
-# Non-root user for security
-RUN addgroup -S isms && adduser -S isms -G isms
+# Non-root user for security + su-exec for privilege drop in entrypoint
+RUN addgroup -S isms && adduser -S isms -G isms \
+    && apk add --no-cache su-exec
 
 # Copy installed modules from build stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -34,7 +35,10 @@ COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh \
     && chown -R isms:isms /app
 
-USER isms
+# Container startet als root: Entrypoint legt Verzeichnisse an, chownt das
+# (ggf. bind-gemountete) data/-Verzeichnis und wechselt dann per su-exec zu
+# isms. USER isms hier zu setzen würde das verhindern (kein chown-Recht auf
+# host-gemountete Verzeichnisse mit abweichendem Owner) — s. GitHub Issue #46.
 
 # Environment defaults (override via .env.docker oder docker run -e)
 ENV NODE_ENV=production \
