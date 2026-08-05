@@ -3,6 +3,11 @@
 
 const { getDb, init: initDb } = require('../knexDatabase')
 
+async function db() {
+  await initDb()
+  return getDb()
+}
+
 const VALID_STATUSES = ['draft', 'review', 'approved', 'archived']
 const TRANSITIONS = {
   draft:    [{ to: 'review',    minRole: 'editor' }],
@@ -52,7 +57,7 @@ module.exports = {
   init: async () => { await initDb() },
 
   getTemplates: async ({ type, language, status } = {}) => {
-    const q = getDb()('templates').whereNull('deleted_at')
+    const q = (await db())('templates').whereNull('deleted_at')
     if (type)     q.where('type', type)
     if (language) q.where('language', language)
     if (status)   q.where('status', status)
@@ -62,7 +67,7 @@ module.exports = {
   },
 
   getTemplate: async (type, id) => {
-    const row = await getDb()('templates')
+    const row = await (await db())('templates')
       .where('type', type)
       .where('id', id)
       .whereNull('deleted_at')
@@ -73,7 +78,7 @@ module.exports = {
   createTemplate: async ({ type, language, title, content, owner, parentId }) => {
     const id  = generateId(type)
     const now = nowISO()
-    await getDb()('templates').insert({
+    await (await db())('templates').insert({
       id,
       type,
       language: language || 'de',
@@ -97,7 +102,7 @@ module.exports = {
   },
 
   updateTemplate: async (type, id, { title, content, owner, applicableEntities, linkedControls, parentId, nextReviewDate }) => {
-    const row = await getDb()('templates')
+    const row = await (await db())('templates')
       .where('type', type).where('id', id).whereNull('deleted_at').first()
     if (!row) return null
     const t = rowToTemplate(row)
@@ -114,7 +119,7 @@ module.exports = {
     t.updatedAt = nowISO()
     t.history.push({ version: t.version, content: t.content, updatedAt: t.updatedAt })
 
-    await getDb()('templates').where('type', type).where('id', id).update({
+    await (await db())('templates').where('type', type).where('id', id).update({
       title: t.title,
       content: t.content,
       version: t.version,
@@ -131,14 +136,14 @@ module.exports = {
   },
 
   addLinkedControl: async (templateType, templateId, controlId) => {
-    const row = await getDb()('templates')
+    const row = await (await db())('templates')
       .where('type', templateType).where('id', templateId).whereNull('deleted_at').first()
     if (!row) return null
     const t = rowToTemplate(row)
     if (!t.linkedControls.includes(controlId)) {
       t.linkedControls.push(controlId)
       t.updatedAt = nowISO()
-      await getDb()('templates').where('type', templateType).where('id', templateId).update({
+      await (await db())('templates').where('type', templateType).where('id', templateId).update({
         linked_controls: JSON.stringify(t.linkedControls),
         updated_at: t.updatedAt,
       })
@@ -147,13 +152,13 @@ module.exports = {
   },
 
   removeLinkedControl: async (templateType, templateId, controlId) => {
-    const row = await getDb()('templates')
+    const row = await (await db())('templates')
       .where('type', templateType).where('id', templateId).whereNull('deleted_at').first()
     if (!row) return null
     const t = rowToTemplate(row)
     t.linkedControls = t.linkedControls.filter(c => c !== controlId)
     t.updatedAt = nowISO()
-    await getDb()('templates').where('type', templateType).where('id', templateId).update({
+    await (await db())('templates').where('type', templateType).where('id', templateId).update({
       linked_controls: JSON.stringify(t.linkedControls),
       updated_at: t.updatedAt,
     })
@@ -161,7 +166,7 @@ module.exports = {
   },
 
   setStatus: async (type, id, { status: newStatus, changedBy, role }) => {
-    const row = await getDb()('templates')
+    const row = await (await db())('templates')
       .where('type', type).where('id', id).whereNull('deleted_at').first()
     if (!row) return { ok: false, error: 'Not found' }
     if (!VALID_STATUSES.includes(newStatus)) return { ok: false, error: 'Invalid status' }
@@ -185,7 +190,7 @@ module.exports = {
     if (!Array.isArray(t.statusHistory)) t.statusHistory = []
     t.statusHistory.push({ status: newStatus, changedBy: changedBy || 'unknown', changedAt: now })
 
-    await getDb()('templates').where('type', type).where('id', id).update({
+    await (await db())('templates').where('type', type).where('id', id).update({
       status: newStatus,
       updated_at: now,
       status_history: JSON.stringify(t.statusHistory),
@@ -194,21 +199,21 @@ module.exports = {
   },
 
   deleteTemplate: async (type, id, deletedBy) => {
-    const affected = await getDb()('templates')
+    const affected = await (await db())('templates')
       .where('type', type).where('id', id).whereNull('deleted_at')
       .update({ deleted_at: nowISO(), deleted_by: deletedBy || null })
     return affected > 0
   },
 
   permanentDeleteTemplate: async (type, id) => {
-    const affected = await getDb()('templates').where('type', type).where('id', id).del()
+    const affected = await (await db())('templates').where('type', type).where('id', id).del()
     return affected > 0
   },
 
   restoreTemplate: async (type, id) => {
-    const row = await getDb()('templates').where('type', type).where('id', id).first()
+    const row = await (await db())('templates').where('type', type).where('id', id).first()
     if (!row) return null
-    await getDb()('templates').where('type', type).where('id', id).update({
+    await (await db())('templates').where('type', type).where('id', id).update({
       deleted_at: null,
       deleted_by: null,
       updated_at: nowISO(),
@@ -217,26 +222,26 @@ module.exports = {
   },
 
   getDeletedTemplates: async () => {
-    const rows = await getDb()('templates')
+    const rows = await (await db())('templates')
       .whereNotNull('deleted_at')
       .orderBy('deleted_at', 'desc')
     return rows.map(rowToTemplate)
   },
 
   getHistory: async (type, id) => {
-    const row = await getDb()('templates').where('type', type).where('id', id)
+    const row = await (await db())('templates').where('type', type).where('id', id)
       .first('history')
     return row ? _json(row.history, []) : null
   },
 
   getStatusHistory: async (type, id) => {
-    const row = await getDb()('templates').where('type', type).where('id', id)
+    const row = await (await db())('templates').where('type', type).where('id', id)
       .first('status_history')
     return row ? _json(row.status_history, []) : null
   },
 
   getTemplateTree: async (type, language) => {
-    const q = getDb()('templates').whereNull('deleted_at')
+    const q = (await db())('templates').whereNull('deleted_at')
     if (type)     q.where('type', type)
     if (language) q.where('language', language)
     const list = (await q).map(rowToTemplate)
@@ -258,7 +263,7 @@ module.exports = {
   },
 
   moveTemplate: async (type, id, { parentId, sortOrder }) => {
-    const row = await getDb()('templates').where('type', type).where('id', id).first()
+    const row = await (await db())('templates').where('type', type).where('id', id).first()
     if (!row) return null
 
     if (parentId) {
@@ -268,11 +273,11 @@ module.exports = {
         if (cursor === id) return { error: 'circular' }
         if (visited.has(cursor)) break
         visited.add(cursor)
-        const p = await getDb()('templates').where('id', cursor).first('parent_id')
+        const p = await (await db())('templates').where('id', cursor).first('parent_id')
         cursor = p?.parent_id || null
       }
     }
-    await getDb()('templates').where('type', type).where('id', id).update({
+    await (await db())('templates').where('type', type).where('id', id).update({
       parent_id: parentId || null,
       sort_order: sortOrder ?? row.sort_order,
       updated_at: nowISO(),
@@ -282,7 +287,7 @@ module.exports = {
 
   reorderTemplates: async (updates) => {
     for (const { id, sortOrder } of updates) {
-      await getDb()('templates').where('id', id).update({
+      await (await db())('templates').where('id', id).update({
         sort_order: sortOrder,
         updated_at: nowISO(),
       })
@@ -297,7 +302,7 @@ module.exports = {
     while (currentId) {
       if (visited.has(currentId)) break
       visited.add(currentId)
-      const row = await getDb()('templates').where('id', currentId)
+      const row = await (await db())('templates').where('id', currentId)
         .first('id', 'title', 'type', 'parent_id')
       if (!row) break
       crumbs.unshift({ id: row.id, title: row.title, type: row.type })
@@ -307,13 +312,13 @@ module.exports = {
   },
 
   addAttachment: async (type, id, attachmentMeta) => {
-    const row = await getDb()('templates')
+    const row = await (await db())('templates')
       .where('type', type).where('id', id).whereNull('deleted_at').first()
     if (!row) return null
     const t = rowToTemplate(row)
     t.attachments.push(attachmentMeta)
     t.updatedAt = nowISO()
-    await getDb()('templates').where('type', type).where('id', id).update({
+    await (await db())('templates').where('type', type).where('id', id).update({
       attachments: JSON.stringify(t.attachments),
       updated_at: t.updatedAt,
     })
@@ -321,14 +326,14 @@ module.exports = {
   },
 
   removeAttachment: async (type, id, attId) => {
-    const row = await getDb()('templates')
+    const row = await (await db())('templates')
       .where('type', type).where('id', id).whereNull('deleted_at').first()
     if (!row) return null
     const t = rowToTemplate(row)
     const att = t.attachments.find(a => a.id === attId) || null
     t.attachments = t.attachments.filter(a => a.id !== attId)
     t.updatedAt = nowISO()
-    await getDb()('templates').where('type', type).where('id', id).update({
+    await (await db())('templates').where('type', type).where('id', id).update({
       attachments: JSON.stringify(t.attachments),
       updated_at: t.updatedAt,
     })
