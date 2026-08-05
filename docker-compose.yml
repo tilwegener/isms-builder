@@ -5,7 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: isms-builder:latest
     container_name: isms-builder
     restart: unless-stopped
     ports:
