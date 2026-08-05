@@ -77,7 +77,9 @@ try {
 }
 
 // Initialize storage backend
-storage.init?.()
+const storageReady = Promise.resolve(storage.init?.()).catch(e => {
+  console.error('[storage] init failed:', e.message)
+})
 
 // ── Root route ──
 // Leitet zur Login-Seite weiter — die eigentliche App liegt unter /ui/.
@@ -85,6 +87,13 @@ storage.init?.()
 // Fix für GitHub Issue #11 (dukefleed66, 2026-03-16).
 app.get('/', (req, res) => {
   res.redirect('/ui/login.html')
+})
+
+// Ensure Knex-backed storage has finished creating/migrating tables before any
+// API route can execute module-specific store queries during startup.
+app.use(async (req, res, next) => {
+  await storageReady
+  next()
 })
 
 // ── Health Check (kein Auth erforderlich) ──
@@ -149,26 +158,27 @@ try {
 }
 
 // ── Autopurge: Einträge nach 30 Tagen endgültig löschen ──────────────────────
-function runAutopurge() {
+async function runAutopurge() {
+  await storageReady
   const CUTOFF = new Date(Date.now() - 30 * 86400000).toISOString()
   let total = 0
 
-  function purge(label, getDeleted, permanentDeleteFn) {
+  async function purge(label, getDeleted, permanentDeleteFn) {
     try {
-      const items = getDeleted() || []
-      items.filter(i => i.deletedAt && i.deletedAt < CUTOFF).forEach(i => {
-        permanentDeleteFn(i.id)
+      const items = await getDeleted() || []
+      for (const item of items.filter(i => i.deletedAt && i.deletedAt < CUTOFF)) {
+        await permanentDeleteFn(item.id)
         total++
-      })
+      }
     } catch(e) { console.warn(`[autopurge] ${label}: ${e.message}`) }
   }
 
   // Templates: need type parameter
   try {
-    const deletedTmpl = storage.getDeletedTemplates?.() || []
-    deletedTmpl.filter(t => t.deletedAt && t.deletedAt < CUTOFF).forEach(t => {
-      try { storage.permanentDeleteTemplate?.(t.type, t.id); total++ } catch {}
-    })
+    const deletedTmpl = await storage.getDeletedTemplates?.() || []
+    for (const t of deletedTmpl.filter(t => t.deletedAt && t.deletedAt < CUTOFF)) {
+      try { await storage.permanentDeleteTemplate?.(t.type, t.id); total++ } catch {}
+    }
   } catch(e) { console.warn(`[autopurge] Templates: ${e.message}`) }
 
   const riskStore     = require('./db/riskStore')
@@ -179,74 +189,55 @@ function runAutopurge() {
   const gdprStore     = require('./db/gdprStore')
   const pubStore      = require('./db/publicIncidentStore')
 
-  purge('Risks',              () => riskStore.getDeleted(),                     (id) => riskStore.permanentDelete(id))
-  purge('Goals',              () => goalsStore.getDeleted(),                    (id) => goalsStore.permanentDelete(id))
-  purge('Guidance',           () => guidanceStore.getDeleted(),                 (id) => guidanceStore.permanentDelete(id))
-  purge('Training',           () => trainingStore.getDeleted(),                 (id) => trainingStore.permanentDelete(id))
-  purge('Contracts',          () => legalStore.contracts.getDeleted(),          (id) => legalStore.contracts.permanentDelete(id))
-  purge('NDAs',               () => legalStore.ndas.getDeleted(),               (id) => legalStore.ndas.permanentDelete(id))
-  purge('Policies',           () => legalStore.privacyPolicies.getDeleted(),    (id) => legalStore.privacyPolicies.permanentDelete(id))
-  purge('GDPR VVT',           () => gdprStore.vvt.getDeleted(),                 (id) => gdprStore.vvt.permanentDelete(id))
-  purge('GDPR AV',            () => gdprStore.av.getDeleted(),                  (id) => gdprStore.av.permanentDelete(id))
-  purge('GDPR DSFA',          () => gdprStore.dsfa.getDeleted(),                (id) => gdprStore.dsfa.permanentDelete(id))
-  purge('GDPR Incidents',     () => gdprStore.incidents.getDeleted(),           (id) => gdprStore.incidents.permanentDelete(id))
-  purge('GDPR DSAR',          () => gdprStore.dsar.getDeleted(),                (id) => gdprStore.dsar.permanentDelete(id))
-  purge('GDPR TOMs',          () => gdprStore.toms.getDeleted(),                (id) => gdprStore.toms.permanentDelete(id))
-  purge('Public Incidents',   () => pubStore.getDeleted(),                      (id) => pubStore.permanentDelete(id))
+  await purge('Risks',              () => riskStore.getDeleted(),                     (id) => riskStore.permanentDelete(id))
+  await purge('Goals',              () => goalsStore.getDeleted(),                    (id) => goalsStore.permanentDelete(id))
+  await purge('Guidance',           () => guidanceStore.getDeleted(),                 (id) => guidanceStore.permanentDelete(id))
+  await purge('Training',           () => trainingStore.getDeleted(),                 (id) => trainingStore.permanentDelete(id))
+  await purge('Contracts',          () => legalStore.contracts.getDeleted(),          (id) => legalStore.contracts.permanentDelete(id))
+  await purge('NDAs',               () => legalStore.ndas.getDeleted(),               (id) => legalStore.ndas.permanentDelete(id))
+  await purge('Policies',           () => legalStore.privacyPolicies.getDeleted(),    (id) => legalStore.privacyPolicies.permanentDelete(id))
+  await purge('GDPR VVT',           () => gdprStore.vvt.getDeleted(),                 (id) => gdprStore.vvt.permanentDelete(id))
+  await purge('GDPR AV',            () => gdprStore.av.getDeleted(),                  (id) => gdprStore.av.permanentDelete(id))
+  await purge('GDPR DSFA',          () => gdprStore.dsfa.getDeleted(),                (id) => gdprStore.dsfa.permanentDelete(id))
+  await purge('GDPR Incidents',     () => gdprStore.incidents.getDeleted(),           (id) => gdprStore.incidents.permanentDelete(id))
+  await purge('GDPR DSAR',          () => gdprStore.dsar.getDeleted(),                (id) => gdprStore.dsar.permanentDelete(id))
+  await purge('GDPR TOMs',          () => gdprStore.toms.getDeleted(),                (id) => gdprStore.toms.permanentDelete(id))
+  await purge('Public Incidents',   () => pubStore.getDeleted(),                      (id) => pubStore.permanentDelete(id))
 
   const supplierStore = require('./db/supplierStore')
-  purge('Suppliers',          () => supplierStore.getDeleted(),                  (id) => supplierStore.permanentDelete(id))
+  await purge('Suppliers',          () => supplierStore.getDeleted(),                  (id) => supplierStore.permanentDelete(id))
 
   const findingStore  = require('./db/findingStore')
-  purge('Findings',           () => findingStore.getDeleted(),                   (id) => findingStore.permanentDelete(id))
+  await purge('Findings',           () => findingStore.getDeleted(),                   (id) => findingStore.permanentDelete(id))
 
   if (total > 0) console.log(`[autopurge] ${total} Einträge nach 30 Tagen endgültig gelöscht`)
 }
 
 // Autopurge beim Serverstart
-runAutopurge()
+runAutopurge().catch(e => console.warn(`[autopurge] ${e.message}`))
 
-// Architekturdokumentation in Guidance einspielen (idempotent)
-try {
-  require('./db/guidanceStore').seedArchitectureDocs()
-} catch (e) {
-  console.warn('[seed] Architekturdokumentation konnte nicht eingespeist werden:', e.message)
+// Guidance seed documents (idempotent) after the shared Knex schema is ready.
+async function runGuidanceSeeds() {
+  await storageReady
+  const guidanceStore = require('./db/guidanceStore')
+  const seeds = [
+    ['Architekturdokumentation', () => guidanceStore.seedArchitectureDocs()],
+    ['Demo-Beitrag', () => guidanceStore.seedDemoDoc()],
+    ['Rollen-Guides', () => guidanceStore.seedRoleGuides()],
+    ['SoA-Guide', () => guidanceStore.seedSoaGuide()],
+    ['Policy-Guide', () => guidanceStore.seedPolicyGuide()],
+    ['ISO-Hinweis', () => guidanceStore.seedIsoNotice()],
+  ]
+  for (const [label, seed] of seeds) {
+    try {
+      await seed()
+    } catch (e) {
+      console.warn(`[seed] ${label} konnte nicht eingespeist werden: ${e.message}`)
+    }
+  }
 }
 
-// Demo-Übersichts-Beitrag im Systemhandbuch (idempotent, verschwindet nach Demo-Reset)
-try {
-  require('./db/guidanceStore').seedDemoDoc()
-} catch (e) {
-  console.warn('[seed] Demo-Beitrag konnte nicht eingespeist werden:', e.message)
-}
-
-// Rollen-Bedienungsanleitungen im Systemhandbuch (idempotent)
-try {
-  require('./db/guidanceStore').seedRoleGuides()
-} catch (e) {
-  console.warn('[seed] Rollen-Guides konnten nicht eingespeist werden:', e.message)
-}
-
-// SoA & Audit Leitfaden (idempotent)
-try {
-  require('./db/guidanceStore').seedSoaGuide()
-} catch (e) {
-  console.warn('[seed] SoA-Guide konnte nicht eingespeist werden:', e.message)
-}
-
-// Policy-Prozesse Leitfaden (idempotent)
-try {
-  require('./db/guidanceStore').seedPolicyGuide()
-} catch (e) {
-  console.warn('[seed] Policy-Guide konnte nicht eingespeist werden:', e.message)
-}
-
-// ISO-Controls Rechtlicher Hinweis (idempotent, immer sichtbar)
-try {
-  require('./db/guidanceStore').seedIsoNotice()
-} catch (e) {
-  console.warn('[seed] ISO-Hinweis konnte nicht eingespeist werden:', e.message)
-}
+runGuidanceSeeds().catch(e => console.warn(`[seed] ${e.message}`))
 
 // ── Export für Tests ──────────────────────────────────────────────────────────
 module.exports = app
