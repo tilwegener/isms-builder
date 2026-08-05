@@ -6,7 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: isms-builder
-    image: tilwegener/isms-builder
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
