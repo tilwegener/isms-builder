@@ -27,6 +27,23 @@ updates:
       # Siehe: server/ai/greenobonePdfParser.js, PINNED-DEPS.md
       - dependency-name: "pdf-parse"
         versions: [">= 1.1.2"]
+      # SQL-Treiber: ausgeliefert wird STORAGE_BACKEND=json. knex, pg,
+      # better-sqlite3 und mysql2 werden nur im Zweig
+      # `if (STORAGE_BACKEND !== 'json')` der Stores geladen und laufen im
+      # Normalbetrieb nie. Solange die DB-Migration nicht begonnen hat, erzeugen
+      # wöchentliche Bumps dieser vier Pakete nur Review-Aufwand ohne
+      # Risikoreduktion. Diese vier Einträge entfallen mit dem Start der
+      # Migration; dann wird einmalig alles auf aktuell gezogen.
+      # Sicherheitsnetz bleibt `npm audit --audit-level=high` in der CI: ein
+      # veröffentlichtes Advisory bricht den Build unabhängig von Dependabot.
+      - dependency-name: "knex"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "pg"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "better-sqlite3"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "mysql2"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
 
   # GitHub Actions – Actions selbst aktuell halten
   - package-ecosystem: "github-actions"

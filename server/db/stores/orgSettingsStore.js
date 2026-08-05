@@ -59,7 +59,7 @@ const DEFAULTS = {
   languageConfig: {
     available: ['de', 'en', 'fr', 'nl'], default: 'en',
   },
-  navOrder: ['dashboard','soa','guidance','goals','risk','legal','incident','gdpr','training','assets','governance','bcm','suppliers','reports','calendar','settings','admin'],
+  navOrder: ['dashboard','soa','guidance','goals','risk','legal','incident','gdpr','training','assets','governance','nis2','bcm','suppliers','policy-acks','reports','calendar','settings','admin'],
   emailNotifications: {
     enabled: false, adminEmail: '', risks: true, dsar: true,
     gdprIncidents: true, deletionLog: true, bcm: true, contracts: true,

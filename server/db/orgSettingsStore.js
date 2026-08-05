@@ -130,7 +130,7 @@ const DEFAULTS = {
   },
 
   // Navigations-Reihenfolge (array der Section-IDs; fehlende landen am Ende)
-  navOrder: ['dashboard','soa','guidance','goals','risk','legal','incident','gdpr','training','assets','governance','bcm','suppliers','reports','calendar','settings','admin'],
+  navOrder: ['dashboard','soa','guidance','goals','risk','legal','incident','gdpr','training','assets','governance','nis2','bcm','suppliers','policy-acks','reports','calendar','settings','admin'],
 
   // E-Mail-Benachrichtigungen (Digest, täglich)
   emailNotifications: {
